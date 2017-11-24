@@ -19,6 +19,8 @@ I3 0 n3 0
 I4 0 n4 0
 I5 n2 n4 0
 V1 n6 n8 0
+C1 n5 n8 1
+L1 n0 n4 1
 .end
 
 

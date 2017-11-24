@@ -1,16 +1,20 @@
 #!python3
-# see also https://pyspice.fabrice-salvaire.fr/examples/spice-parser/bootstrap-example.html
+# see also 
+#	https://pyspice.fabrice-salvaire.fr/examples/spice-parser/bootstrap-example.html
+#	https://stackoverflow.com/questions/11415570/directory-path-types-with-argparse
+#	https://docs.python.org/3/library/argparse.html#name-or-flags
 
 import os
 import sys
+import re
+import argparse # <filename> [--format <fmt>]  [--debug] 
+parser = argparse.ArgumentParser(description='Provide a SPICE netlist file and turn it into symbolic equations.')
+parser.add_argument('filename', type=lambda x: x if os.path.isfile(x) else None, help='input file (SPICE netlist)')
+parser.add_argument('-f','--format', type=str, default='default', choices=['default','maxima'], help='select an output format')
+parser.add_argument('-d','--debug', action='store_true', help='enable debug output')
+args = parser.parse_args()
 
-if len(sys.argv) != 2:
-	print('This script must be called with exactly one filename. usage:\r\n\tsymboleq.py "<spice netlist file>"')
-	exit(0)
-fn = sys.argv[1]
-
-netlist_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), fn)
-
+netlist_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), args.filename)	
 
 import PySpice
 import PySpice.Logging.Logging as Logging
@@ -24,11 +28,19 @@ from PySpice.Unit import *
 
 
 def debug_print(*arg):
-	#print(*arg)
+	if args.debug:
+		print(*arg)
 	return
 
-def result_print(*arg):
-	print(*arg)
+def result_print(s):
+	if args.format == 'maxima':
+		s = re.sub(r'V\(n([0-9]*)\)', lambda mo:'V['+mo.group(1)+']', s)	
+		s = re.sub(r'V\(V([0-9]*)\)', lambda mo:'U['+mo.group(1)+']', s)
+		s = re.sub(r'I([0-9]*)', lambda mo:'I['+mo.group(1)+']', s)
+		s = re.sub(r'R([0-9]*)', lambda mo:'R['+mo.group(1)+']', s)
+		s = re.sub(r'C([0-9]*)', lambda mo:'C['+mo.group(1)+']', s)
+		s = re.sub(r'L([0-9]*)', lambda mo:'L['+mo.group(1)+']', s)
+	print(s)
 	return
 
 
@@ -90,9 +102,9 @@ def get_element_current_terms(node, element):
 	handler = {
 		'Resistor': lambda node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
 			resistor_symbol(node, element), ''],
-		'Capacitor': node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
+		'BehavioralCapacitor': lambda node, element: ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
 			capacitor_symbol(node, element), ''],
-		'Inductor': node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
+		'BehavioralInductor': lambda node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
 			inductor_symbol(node, element), ''],
 		'CurrentSource': lambda node, element : ['',current_symbol(node, element)],
 		'VoltageSource': lambda node, element : ['', ''],
