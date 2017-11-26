@@ -70,9 +70,11 @@ def node_voltage_symbol(nodename):
 	return sym
 	
 		
-def current_symbol(node, element):
-	i = element.nodes.index(node.name)
-	if i == 0:
+def current_symbol(node, element,negate = False):
+	# determine which way around the current source is connected
+	# "negate" inverts the sign for use with rhs terms
+	i = element.nodes.index(node.name) 
+	if (i == 0) ^ bool(negate):
 		return '(-'+element.name+')'
 	else:
 		return element.name
@@ -106,7 +108,7 @@ def get_element_current_terms(node, element):
 			capacitor_symbol(node, element), ''],
 		'BehavioralInductor': lambda node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
 			inductor_symbol(node, element), ''],
-		'CurrentSource': lambda node, element : ['',current_symbol(node, element)],
+		'CurrentSource': lambda node, element : ['',current_symbol(node, element, True)],
 		'VoltageSource': lambda node, element : ['', ''],
 		'default' : lambda node, element : ['[unknown]','']
 	}
