@@ -7,14 +7,7 @@
 import os
 import sys
 import re
-import argparse # <filename> [--format <fmt>]  [--debug] 
-parser = argparse.ArgumentParser(description='Provide a SPICE netlist file and turn it into symbolic equations.')
-parser.add_argument('filename', type=lambda x: x if os.path.isfile(x) else None, help='input file (SPICE netlist)')
-parser.add_argument('-f','--format', type=str, default='default', choices=['default','maxima'], help='select an output format')
-parser.add_argument('-d','--debug', action='store_true', help='enable debug output')
-args = parser.parse_args()
-
-netlist_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), args.filename)	
+import argparse
 
 import PySpice
 import PySpice.Logging.Logging as Logging
@@ -27,11 +20,23 @@ from PySpice.Spice.Parser import SpiceParser
 from PySpice.Unit import *
 
 
+def init_args(): 
+	# <filename> [--format <fmt>]  [--debug] 
+	parser = argparse.ArgumentParser(description='Provide a SPICE netlist file and turn it into symbolic equations.')
+	parser.add_argument('filename', type=lambda x: x if os.path.isfile(x) else None, help='input file (SPICE netlist)')
+	parser.add_argument('-f','--format', type=str, default='default', choices=['default','maxima'], help='select an output format')
+	parser.add_argument('-d','--debug', action='store_true', help='enable debug output')
+	return parser.parse_args()
+	
+args = init_args()
+
+
 def debug_print(*arg):
 	if args.debug:
 		print(*arg)
 	return
 
+	
 def result_print(s):
 	if args.format == 'maxima':
 		s = re.sub(r'V\(n([0-9]*)\)', lambda mo:'V['+mo.group(1)+']', s)	
@@ -44,24 +49,29 @@ def result_print(s):
 	return
 
 
-parser = SpiceParser(path=netlist_path)
-circuit = parser.build_circuit()
+def process_netlist(fn):
+	parser  = SpiceParser(path=fn)
+	circuit = parser.build_circuit()
 
-debug_print("GND net is ", circuit.gnd)
-debug_print("nodes :")
-nodes = circuit.nodes
-gnd = None
-for node in nodes:
-	if str(node.name) != str(circuit.gnd):
-		debug_print(node.name)
-	else:
-		gnd = node 
-if gnd != None:
-	nodes.remove(gnd) # remove gnd element from node set 
+	debug_print("GND net is ", circuit.gnd)
+	debug_print("nodes :")
+	nodes = circuit.nodes
+	gnd = None
+	for node in nodes:
+		if str(node.name) != str(circuit.gnd):
+			debug_print(node.name)
+		else:
+			gnd = node 
+	if gnd != None:
+		# remove gnd element from node set 
+		nodes.remove(gnd) 
+	return [parser, circuit, nodes, gnd]
+	
+	
+netlist_path = os.path.join(os.path.realpath(os.path.dirname(__file__)), args.filename)	
+parser, circuit, nodes, gnd = process_netlist(netlist_path)
 		
-		
-
-
+	
 def node_voltage_symbol(nodename):
 	global gnd
 	sym = ''
