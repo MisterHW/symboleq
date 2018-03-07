@@ -39,12 +39,13 @@ def debug_print(*arg):
 	
 def result_print(s):
 	if args.format == 'maxima':
-		s = re.sub(r'V\(n([0-9]*)\)', lambda mo:'V['+mo.group(1)+']', s)	
-		s = re.sub(r'V\(V([0-9]*)\)', lambda mo:'U['+mo.group(1)+']', s)
-		s = re.sub(r'I([0-9]*)', lambda mo:'I['+mo.group(1)+']', s)
-		s = re.sub(r'R([0-9]*)', lambda mo:'R['+mo.group(1)+']', s)
-		s = re.sub(r'C([0-9]*)', lambda mo:'C['+mo.group(1)+']', s)
-		s = re.sub(r'L([0-9]*)', lambda mo:'L['+mo.group(1)+']', s)
+		s = re.sub(r'I\(V([A-Za-z0-9]+)\)', lambda mo:'I[V'+mo.group(1)+']', s)	
+		s = re.sub(r'V\(([0-9]*)\)', lambda mo:'V['+mo.group(1)+']', s)
+		s = re.sub(r'V\(([A-Za-z0-9]+)\)', lambda mo:'U['+mo.group(1)+']', s)
+		s = re.sub(r'I([A-Za-z0-9]+)', lambda mo:'I['+mo.group(1)+']', s)
+		s = re.sub(r'R([A-Za-z0-9]+)', lambda mo:'R['+mo.group(1)+']', s)
+		s = re.sub(r'C([A-Za-z0-9]+)', lambda mo:'C['+mo.group(1)+']', s)
+		s = re.sub(r'L([A-Za-z0-9]+)', lambda mo:'L['+mo.group(1)+']', s)
 	print(s)
 	return
 
@@ -80,14 +81,14 @@ def node_voltage_symbol(nodename):
 	return sym
 	
 		
-def current_symbol(node, element,negate = False):
+def current_symbol(node, element,negate = False, prefix='', suffix=''):
 	# determine which way around the current source is connected
 	# "negate" inverts the sign for use with rhs terms
 	i = element.nodes.index(node.name) 
 	if (i == 0) ^ bool(negate):
-		return '(-'+element.name+')'
+		return '(-' + prefix + element.name + suffix + ')'
 	else:
-		return element.name
+		return prefix + element.name + suffix
 		
 		
 def pin_voltage_symbol(node, element):
@@ -119,7 +120,7 @@ def get_element_current_terms(node, element):
 		'BehavioralInductor': lambda node, element : ['(' + pin_voltage_symbol(node, element) + '-' + node_voltage_symbol(node.name) + ')/'+
 			inductor_symbol(node, element), ''],
 		'CurrentSource': lambda node, element : ['',current_symbol(node, element, True)],
-		'VoltageSource': lambda node, element : ['', ''],
+		'VoltageSource': lambda node, element : ['',current_symbol(node, element, False, 'I(',')')],
 		'default' : lambda node, element : ['[unknown]','']
 	}
 	if element.__class__.__name__ in handler:
@@ -136,18 +137,20 @@ def get_element_voltage_terms(node, element):
 			sides[0] = node_voltage_symbol(node.name)
 			if str(element.nodes[0]) != str(gnd.name):
 				sides[0] = sides[0] + ' - ' + node_voltage_symbol(element.nodes[0])
-			sides[1] = 'V('+element.name+')'
+			sides[1] = '(-V('+element.name+'))'
 		# case 3 : return terminal of voltage source connected to node net, output terminal connected to gnd
 		#          this will only show up once because the gnd node is not processed
 		if (str(node.name) == str(element.nodes[0])) and (str(gnd.name) == str(element.nodes[1])):
 			sides[0] = node_voltage_symbol(node.name)
-			sides[1] = '(-V('+element.name+'))'
+			sides[1] = 'V('+element.name+')'
 	return sides 
 		
 		
 def generate_equations(termfunc, accumulate = True):
 	global nodes 
 
+	debug_print()
+	
 	for node in nodes:
 		debug_print("node ", node.name)
 		elements = node.elements
@@ -181,6 +184,7 @@ def generate_equations(termfunc, accumulate = True):
 				continue
 
 		if lhs == '' and rhs == '':
+			debug_print('no more equations for node\n')
 			continue
 			
 		if lhs == '':
